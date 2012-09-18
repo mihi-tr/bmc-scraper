@@ -1,5 +1,7 @@
 from pyquery import PyQuery as pq
+import couchdb.client
 import re
+import urllib2
 
 class Article:
   def __init__(self,url):
@@ -8,7 +10,6 @@ class Article:
   
   def has_fulltext(self):
     html=self.s("div#viewing-options-links").html()
-    print html
     return re.search("Full text",html)
 
   def parse_author_entry(self,entry):
@@ -16,7 +17,7 @@ class Article:
     name=aname.search(entry).group(1)
     affiliation=re.compile(">([0-9]+)</a>")
     affiliations=[int(i) for i in affiliation.findall(entry)]
-    return {"name":name,"affiliations":affiliations}
+    return {"longname":name,"affiliations":affiliations}
 
   def get_authors(self):
     authors="%s"%self.s("p.authors")
@@ -39,12 +40,25 @@ class Article:
    return affiliations
 
 
-    
-    
-
-
 if __name__=="__main__":
-  sample="http://www.biomedcentral.com/1471-2415/12/36/"
-  sample2="http://www.biomedcentral.com/1471-2377/12/93/"
-  art=Article(sample)
-  print art.get_authors()
+  db=couchdb.client.Database('biomedcentral')
+  for row in db.query("""function(d) {if (!  d.author[0].affiliations)
+    {emit(d.author)}}"""):
+    id=row.id
+    entry=db[id]
+    try:
+      art=Article(entry["link"][0]["url"])
+      authors=art.get_authors()
+      for i in range(len(authors)):
+        entry["author"][i]={u'name':entry["author"][i]["name"],
+        u'id':entry["author"][i]["id"],
+        "affiliations":authors[i]["affiliations"]}
+      db[id]=entry  
+      print id
+    except:
+      print "Error with url on %s"%id
+
+    
+    
+
+
