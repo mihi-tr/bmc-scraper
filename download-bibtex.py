@@ -18,7 +18,6 @@ class Page:
   
   def __init__(self,url):
     self.url=url
-    self.do()
  
   def do(self):
     self.fetch()
@@ -57,8 +56,15 @@ class Page:
 
 if __name__=="__main__":
   pages=[Page(u) for u in get_pages_list()]
-
-  bibjson=reduce(lambda x,y: x+y,[i.bibjson for i in pages])
-  f=open("BioMedCentral.json","w")
-  json.dump(bibjson,f)
-  f.close()
+  for page in pages:
+    try:
+      page.do()
+      f=open("BioMedCentral.json")
+      l=json.load(f)
+      f.close()
+      l=l+page.bibjson
+      f=open("BioMedCentral.json","w")
+      l=json.dump(l,f)
+      f.close()
+    except urllib2.HTTPError:
+      print "Error at : %s"%page.url
