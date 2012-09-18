@@ -4,6 +4,7 @@ import re
 import json
 import bibtex
 import itertools
+import couchdb.client
 
 def get_pages_list():
   base_url="http://www.biomedcentral.com/content?page=%s&itemsPerPage=100&citation=true&summary=false&format=BIBTEX_WITH_ABSTRACT"
@@ -56,15 +57,12 @@ class Page:
 
 if __name__=="__main__":
   pages=[Page(u) for u in get_pages_list()]
+  db=couchdb.client.Database('biomedcentral')
   for page in pages:
     try:
       page.do()
-      f=open("BioMedCentral.json")
-      l=json.load(f)
-      f.close()
-      l=l+page.bibjson
-      f=open("BioMedCentral.json","w")
-      l=json.dump(l,f)
-      f.close()
+      for e in page.bibjson:
+        db.save(e)
+      db.commit()  
     except urllib2.HTTPError:
       print "Error at : %s"%page.url
