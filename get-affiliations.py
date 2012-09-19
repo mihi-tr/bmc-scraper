@@ -42,23 +42,40 @@ class Article:
 
 if __name__=="__main__":
   db=couchdb.client.Database('biomedcentral')
-  for row in db.query("""function(d) {if (!  d.author[0].affiliations)
-    {emit(d.author)}}"""):
-    id=row.id
-    entry=db[id]
-    try:
-      art=Article(entry["link"][0]["url"])
-      authors=art.get_authors()
-      for i in range(len(authors)):
-        entry["author"][i]={u'name':entry["author"][i]["name"],
-        u'id':entry["author"][i]["id"],
-        "affiliations":authors[i]["affiliations"]}
-      db[id]=entry  
-      print id
-    except:
-      print "Error with url on %s"%id
-
-    
+  lastid=None
+  fn="""function(d) {if ((! d.author[0].affiliations) && (! d.error)) {
+    emit(d.autor)}}"""
+  try:
+    design=db["_design/biomedcentral"]
+    design["views"]["get_no_affiliates"]["map"]=fn
+  except:
+    design={"views": {"get_no_affiliates": {
+    "map": fn
+    }
+    }
+    }
+  db["_design/biomedcentral"]=design  
+  result=db.view("biomedcentral/get_no_affiliates", limit=100)
+  while (result):
+    for row in result:
+      id=row.id
+      entry=db[id]
+      try:
+        art=Article(entry["link"][0]["url"])
+        authors=art.get_authors()
+        for i in range(len(authors)):
+          entry["author"][i]={u'name':entry["author"][i]["name"],
+          u'id':entry["author"][i]["id"],
+          "affiliations":authors[i]["affiliations"]}
+        db[id]=entry  
+        print id
+      except:
+        print "Error with url on %s"%id
+        entry["error"]=1
+        db[id]=entry
+      lastid=id  
+    result=db.view("biomedcentral/get_no_affiliates", limit=100,
+    startkey_docid=lastid)
     
 
 
